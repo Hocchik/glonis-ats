@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id           String    @id @default(uuid())
+  nombre       String
+  email        String    @unique
+  passwordHash String
+  rol          Rol       @default(RECLUTADOR)
+  creadoEn     DateTime  @default(now())
+  vacantes     Vacante[]
+}
+
+enum Rol {
+  ADMIN
+  RECLUTADOR
+}
+
+model Vacante {
+  id            String        @id @default(uuid())
+  titulo        String
+  area          AreaVacante
+  descripcion   String
+  requisitos    String
+  tipoContrato  String
+  turno         String
+  estado        EstadoVacante @default(ACTIVA)
+  slug          String        @unique
+  fechaCierre   DateTime?
+  creadoEn      DateTime      @default(now())
+  creadoPor     Usuario       @relation(fields: [usuarioId], references: [id])
+  usuarioId     String
+  postulaciones Postulacion[]
+}
+
+enum AreaVacante {
+  VENTAS
+  CAJA
+  ALMACEN
+  VISUAL
+  OTRO
+}
+
+enum EstadoVacante {
+  ACTIVA
+  PAUSADA
+  CERRADA
+}
+
+model Candidato {
+  id            String        @id @default(uuid())
+  nombre        String
+  email         String        @unique
+  telefono      String
+  dni           String?
+  distrito      String?
+  cvUrl         String
+  creadoEn      DateTime      @default(now())
+  postulaciones Postulacion[]
+}
+
+model Postulacion {
+  id             String                @id @default(uuid())
+  etapa          EtapaPipeline         @default(POSTULADO)
+  scoreTotal     Float                 @default(0)
+  creadoEn       DateTime              @default(now())
+  actualizadoEn  DateTime              @updatedAt
+  candidato      Candidato             @relation(fields: [candidatoId], references: [id])
+  candidatoId    String
+  vacante        Vacante               @relation(fields: [vacanteId], references: [id])
+  vacanteId      String
+  score          ScoreDetalle?
+  respuestas     RespuestaFormulario[]
+  entrevistas    Entrevista[]
+  disponibilidad Disponibilidad?
+}
+
+enum EtapaPipeline {
+  POSTULADO
+  EN_REVISION
+  ENTREVISTA
+  OFERTA
+  DESCARTADO
+}
+
+model ScoreDetalle {
+  id                  String      @id @default(uuid())
+  scoreCV             Float
+  scoreDisponibilidad Float
+  scoreCuestionario   Float
+  scoreCoherencia     Float       @default(0)
+  keywordsEncontradas String[]
+  postulacion         Postulacion @relation(fields: [postulacionId], references: [id])
+  postulacionId       String      @unique
+  actualizadoEn       DateTime    @updatedAt
+}
+
+model Disponibilidad {
+  id                 String      @id @default(uuid())
+  turnoManana        Boolean
+  turnoTarde         Boolean
+  turnoNoche         Boolean
+  finesDeSemanaDispo Boolean
+  horasSemanales     Int
+  postulacion        Postulacion @relation(fields: [postulacionId], references: [id])
+  postulacionId      String      @unique
+}
+
+model RespuestaFormulario {
+  id            String      @id @default(uuid())
+  preguntaId    Int
+  valorLikert   Int
+  postulacion   Postulacion @relation(fields: [postulacionId], references: [id])
+  postulacionId String
+}
+
+model Entrevista {
+  id            String              @id @default(uuid())
+  fechaHora     DateTime
+  modalidad     ModalidadEntrevista
+  notas         String?
+  estado        EstadoEntrevista    @default(PROGRAMADA)
+  postulacion   Postulacion         @relation(fields: [postulacionId], references: [id])
+  postulacionId String
+  creadoEn      DateTime            @default(now())
+}
+
+enum ModalidadEntrevista {
+  PRESENCIAL
+  VIDEOLLAMADA
+}
+
+enum EstadoEntrevista {
+  PROGRAMADA
+  REALIZADA
+  CANCELADA
+}

@@ -1,0 +1,20 @@
+{
+  "env": {
+    "ECC_GATEGUARD": "off"
+  },
+  "enabledPlugins": {
+    "superpowers@superpowers-dev": true,
+    "everything-claude-code@everything-claude-code": true,
+    "ui-ux-pro-max@ui-ux-pro-max-skill": true
+  },
+  "mcpServers": {
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres:admin123@localhost:5432/glonis_ats"
+      ]
+    }
+  }
+}

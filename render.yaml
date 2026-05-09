@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: glonis-ats-api
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build && npm run db:deploy
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: glonis-ats-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: HCAPTCHA_SECRET
+        sync: false
+      - key: UPLOAD_DIR
+        value: ./uploads
+      - key: FRONTEND_URL
+        sync: false
+
+databases:
+  - name: glonis-ats-db
+    region: oregon
+    plan: free
+    databaseName: glonis_ats
+    user: glonis

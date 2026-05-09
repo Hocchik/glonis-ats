@@ -1,0 +1,10 @@
+node_modules/
+.env
+backend/.env
+frontend/.env
+dist/
+uploads/*
+!uploads/.gitkeep
+.DS_Store
+*.log
+.claude/settings.local.json
