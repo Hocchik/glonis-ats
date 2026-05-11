@@ -57,7 +57,7 @@ export default function Calendario() {
     const color = ESTADO_COLOR[e.estado] || ESTADO_COLOR.PROGRAMADA;
     return {
       id: e.id,
-      title: `${e.postulacion.candidato.nombre} — ${e.postulacion.vacante.titulo}`,
+      title: e.postulacion.candidato.nombre,
       start: e.fechaHora,
       backgroundColor: color,
       borderColor: color,
@@ -66,6 +66,18 @@ export default function Calendario() {
       extendedProps: { entrevista: e },
     };
   });
+
+  function renderEvent(info) {
+    const d = info.event.start;
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return (
+      <div className="flex items-center gap-1.5 px-1 py-0.5 min-w-0 leading-tight">
+        <span className="font-semibold text-[11px] shrink-0">{hh}:{mm}</span>
+        <span className="text-[11px] truncate">{info.event.title}</span>
+      </div>
+    );
+  }
 
   function abrirCrear() {
     setEditando(null);
@@ -177,7 +189,9 @@ export default function Calendario() {
             initialView="dayGridMonth"
             locale={esLocale}
             events={events}
+            eventContent={renderEvent}
             eventClick={handleEventClick}
+            displayEventTime={false}
             headerToolbar={{
               left: 'prev,next today',
               center: 'title',
