@@ -92,8 +92,12 @@
 ### M1 · Gestión de vacantes (CRUD) ✅
 - Campos: título, área (ventas / caja / almacén / visual / otro), descripción, requisitos, tipo de contrato, turno, estado (activa / pausada / cerrada), fecha de cierre, slug único.
 - El slug se genera automáticamente al crear (`generarSlug(titulo)` con sufijo hex aleatorio).
-- Solo usuarios autenticados (ADMIN o RECLUTADOR) pueden crear/editar/cerrar vacantes.
+- Solo usuarios autenticados (ADMIN o RECLUTADOR) pueden crear/editar/cerrar/eliminar vacantes.
 - `fechaCierre` se valida con `!isNaN(new Date(fechaCierre))` antes de guardar.
+- **Turnos y tipos de contrato son multi-select:** chips toggle en el modal — turnos `[Mañana, Tarde, Noche]` se guardan como `"Mañana / Tarde"`; tipos `[Tiempo completo, Medio tiempo, Part-time, Por horas, Temporal, Practicante]` se guardan como `"Tiempo completo, Medio tiempo"`. Al editar se parsean con `parseLista()` (split por `,` o `/`).
+- **Estado editable solo en modo edición:** chips ACTIVA/PAUSADA/CERRADA en el modal con descripción del impacto (PAUSADA/CERRADA deshabilitan el link público).
+- **Eliminar vacante:** `DELETE /api/vacantes/:id` solo procede si la vacante NO tiene postulaciones (responde 409 `HAS_POSTULACIONES` en su lugar). Si tiene candidatos, hay que cerrarla.
+- **Acciones disponibles desde [VacanteDetalle.jsx](frontend/src/pages/VacanteDetalle.jsx) header:** botones grandes "Copiar link" y "Editar vacante" (mismo modal que Vacantes.jsx, refetch tras guardar).
 
 ### M2 · Formulario público de postulación ✅
 - Ruta: `/postular/:slug` — sin autenticación.
@@ -102,24 +106,34 @@
 - El backend valida exactamente 18 respuestas con `preguntaId` (1–18) y `valorLikert` (1–5).
 - Al enviar: se crea `Candidato` (upsert por email) + `Postulacion` + `ScoreDetalle` + `Disponibilidad` + `RespuestaFormulario[]` en una sola transacción Prisma.
 - El candidato recibe confirmación en pantalla (no por email).
+- **`GET /public/vacantes/:slug` retorna `Cache-Control: no-store`** para evitar que el navegador cachee el 410 cuando una vacante se reactiva.
+- Si la vacante no está `ACTIVA`, responde 410 `VACANTE_CLOSED` y el formulario muestra mensaje de no disponible.
 
 ### M3 · Vista de candidatos por vacante ✅
 - Tabla ordenada por `scoreTotal` desc.
 - Panel lateral derecho con: score total, desglose por componente (barras), keywords encontradas, disponibilidad, ajuste de coherencia (1–5), etapa actual, botón descarga CV.
-- La descarga de CV usa `fetch` con header `Authorization` y crea un Object URL temporal (no `<a href>` directo).
+- **Descarga de CV:** `fetch` con header `Authorization` → blob forzado a `application/pdf` → `URL.createObjectURL` con `appendChild`/`removeChild` para compatibilidad cross-browser. Nombre de archivo sanitizado en frontend (`[a-zA-Z0-9_\- ]`) y backend.
+- Manejo de errores: si el fetch falla, `alert()` con el status o mensaje (antes fallaba silencioso con `if (!res.ok) return`).
 - Navegación prev/next entre candidatos sin cerrar el panel.
 
-### M4 · Tablero Kanban (pipeline) ✅
+### M4 · Tablero de selección (Kanban) ✅
+- **Nombre en el sidebar:** "Tablero de selección" (antes "Pipeline" — renombrado para mejor comprensión del usuario).
 - Columnas fijas: `POSTULADO` → `EN_REVISION` → `ENTREVISTA` → `OFERTA` → `DESCARTADO`
 - Drag-and-drop con `@dnd-kit/core` (PointerSensor, distancia mínima 5px).
 - Al soltar llama a `PATCH /api/postulaciones/:id/etapa`.
 - Filtro por vacante en la barra superior.
 
 ### M5 · Calendario de entrevistas ✅
+- **Nombre en el sidebar:** "Calendario de entrevistas" (antes "Calendario").
 - Vista mensual y semanal (FullCalendar, locale `es`).
+- **Flujo en 2 pasos al agendar:** seleccionar vacante → seleccionar candidato. Solo aparecen vacantes que tienen postulaciones en etapa `ENTREVISTA`. El select de candidatos se filtra automáticamente por la vacante elegida.
+- **Solo candidatos en etapa `ENTREVISTA`** pueden ser agendados. Mueve al candidato a esa etapa desde el Tablero antes de agendar.
+- **Edición de entrevistas:** click en evento abre modal completo con campos editables (fecha, hora, modalidad, estado, notas) + botón eliminar.
+- **Eliminar:** `DELETE /api/entrevistas/:id` para corregir errores humanos.
+- **Zona horaria:** los inputs `datetime-local` se interpretan como **hora de Perú (UTC-5, sin DST)**. Helpers `peruLocalToUTC()` y `utcToPeruLocal()` en [Calendario.jsx](frontend/src/pages/Calendario.jsx) convierten en ambos sentidos para que la hora se preserve sin importar el TZ del navegador.
+- **Renderizado de eventos:** custom `eventContent` muestra **HH:MM en negrita** seguido del nombre del candidato (con `truncate`). Bloque sólido del color del estado (`PROGRAMADA` indigo / `REALIZADA` verde / `CANCELADA` rojo) con texto blanco.
 - Crear entrevista → avanza la postulación a etapa `ENTREVISTA` en la misma transacción.
-- Click en evento → confirmar marcar como `REALIZADA`.
-- `PUT /:id` valida `estado` contra `ESTADOS_VALIDOS` antes de guardar.
+- `PUT /:id` valida `estado` y `modalidad` contra enums antes de guardar.
 
 ### M6 · Motor de Score de Aptitud ✅
 
@@ -353,6 +367,7 @@ POST   /api/vacantes                      → crear vacante
 GET    /api/vacantes/:id                  → detalle
 PUT    /api/vacantes/:id                  → editar
 PATCH  /api/vacantes/:id/estado           → cambiar estado
+DELETE /api/vacantes/:id                  → eliminar (bloqueado si tiene postulaciones)
 
 POSTULACIONES
 GET    /api/postulaciones                 → lista (filtros: vacanteId, etapa) ordenada por score desc
@@ -373,6 +388,7 @@ GET    /api/entrevistas                   → lista (filtros: mes, vacanteId)
 POST   /api/entrevistas                   → crear + avanza postulación a ENTREVISTA
 PUT    /api/entrevistas/:id               → editar (valida estado contra enum)
 PATCH  /api/entrevistas/:id/estado        → cambiar estado
+DELETE /api/entrevistas/:id               → eliminar entrevista
 
 DASHBOARD
 GET    /api/dashboard/resumen             → totalPostulantes, scorePromedio, vacantesActivas, vacantesCerradas
@@ -481,7 +497,7 @@ VITE_HCAPTCHA_SITEKEY="ver-dashboard-hcaptcha"
 
 ## 11. Design system del frontend
 
-- **Sidebar:** `bg-gray-900`, ancho 200px, nav items `rounded-lg`
+- **Sidebar:** `bg-gray-900`, ancho 200px, nav items `rounded-lg`. Orden fijo: **Dashboard → Vacantes → Tablero de selección → Calendario de entrevistas → Configuración** (admin only)
 - **Fuente:** Inter (Google Fonts, cargada en `index.html`)
 - **Color primario:** `indigo-600`
 - **Cards:** `bg-white border border-gray-200 rounded-2xl`
@@ -561,6 +577,7 @@ VITE_HCAPTCHA_SITEKEY="ver-dashboard-hcaptcha"
 | 9.1 | Code review + fixes de seguridad | ✅ Completo |
 | 10 | Security review + fixes | ✅ Completo |
 | 11 | Configuración de deploy (Render + Vercel) | ✅ Completo |
+| 12 | Ajustes post-deploy (UX admin + timezone) | ✅ Completo |
 
 ### Fixes aplicados en code review (2026-05-09)
 - Stream de CV sin error handler → corregido en `candidatos.js`
@@ -598,6 +615,31 @@ VITE_HCAPTCHA_SITEKEY="ver-dashboard-hcaptcha"
 - `backend/package.json` → campo `engines: { node: ">=20.0.0" }` y script `db:deploy`
 - `vite.config.js` → eliminado proxy de `/uploads` (ruta inexistente en producción)
 
+### Ajustes post-deploy — iteración 12 (2026-05-11)
+
+**Gestión de vacantes**
+- Vacantes ahora se pueden **editar** desde la lista y desde el detalle (modal compartido con multi-select de turnos/contratos).
+- Vacantes se pueden **eliminar** (`DELETE /api/vacantes/:id`), bloqueado con 409 si tiene postulaciones — debe cerrarse en su lugar.
+- Estado editable (ACTIVA / PAUSADA / CERRADA) solo en modo edición, con descripción del impacto en el link público.
+- Turnos y tipos de contrato son **multi-select por chips** (Mañana/Tarde/Noche y 6 opciones de contrato).
+- Vista de detalle de vacante: botones grandes **Copiar link** y **Editar vacante** en el header.
+
+**Calendario de entrevistas**
+- Renombrado en sidebar (antes "Calendario").
+- Flujo de agendar en 2 pasos: **vacante → candidato** (solo aparecen las que tienen candidatos en etapa `ENTREVISTA`).
+- Restricción: **solo candidatos en `ENTREVISTA`** pueden ser agendados.
+- Modal de edición completo: click en evento abre fecha/hora/modalidad/estado/notas + botón **eliminar entrevista** (`DELETE /api/entrevistas/:id`).
+- **Zona horaria de Perú (UTC-5):** helpers `peruLocalToUTC()` y `utcToPeruLocal()` para que los `datetime-local` se guarden y muestren correctamente sin importar el TZ del navegador.
+- **Render custom de eventos:** bloque sólido del color del estado + texto `HH:MM` en negrita seguido del nombre del candidato truncado.
+
+**Sidebar**
+- Renombrado: "Pipeline" → **Tablero de selección**; "Calendario" → **Calendario de entrevistas**.
+- Nuevo orden: **Dashboard → Vacantes → Tablero de selección → Calendario de entrevistas**.
+
+**Otros**
+- Descarga de CV con manejo de errores (`alert` si falla), `Content-Type` forzado a `application/pdf` y `appendChild`/`removeChild` para compatibilidad cross-browser.
+- `GET /public/vacantes/:slug` devuelve `Cache-Control: no-store` para que al reactivar una vacante el link vuelva a funcionar sin el 410 cacheado.
+
 ---
 
-*Última actualización: 2026-05-09 · v2.1*
+*Última actualización: 2026-05-11 · v2.2*
