@@ -8,17 +8,28 @@ import { PREGUNTAS } from '../lib/preguntas';
 async function descargarCV(candidatoId, nombre) {
   const base = import.meta.env.VITE_API_URL || '';
   const token = localStorage.getItem('token');
-  const res = await fetch(`${base}/api/candidatos/${candidatoId}/cv`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) return;
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${nombre}-CV.pdf`;
-  a.click();
-  URL.revokeObjectURL(url);
+  try {
+    const res = await fetch(`${base}/api/candidatos/${candidatoId}/cv`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) {
+      alert('No se pudo descargar el CV: ' + res.status);
+      return;
+    }
+    const blob = await res.blob();
+    const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+    const url = URL.createObjectURL(pdfBlob);
+    const safe = (nombre || 'candidato').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safe}-CV.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    alert('Error al descargar el CV: ' + err.message);
+  }
 }
 
 const ETAPAS = ['POSTULADO', 'EN_REVISION', 'ENTREVISTA', 'OFERTA', 'DESCARTADO'];

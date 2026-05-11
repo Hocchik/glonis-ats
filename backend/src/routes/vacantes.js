@@ -119,6 +119,27 @@ router.put('/:id', auth, async (req, res, next) => {
   }
 });
 
+router.delete('/:id', auth, async (req, res, next) => {
+  try {
+    const conteo = await prisma.postulacion.count({ where: { vacanteId: req.params.id } });
+    if (conteo > 0) {
+      return res.status(409).json({
+        error: true,
+        message: `No se puede eliminar: la vacante tiene ${conteo} postulación${conteo !== 1 ? 'es' : ''}. Ciérrala en su lugar.`,
+        code: 'HAS_POSTULACIONES',
+      });
+    }
+
+    await prisma.vacante.delete({ where: { id: req.params.id } });
+    res.status(204).end();
+  } catch (err) {
+    if (err.code === 'P2025') {
+      return res.status(404).json({ error: true, message: 'Vacante no encontrada', code: 'NOT_FOUND' });
+    }
+    next(err);
+  }
+});
+
 router.patch('/:id/estado', auth, async (req, res, next) => {
   try {
     const { estado } = req.body;

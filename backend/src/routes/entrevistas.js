@@ -143,4 +143,16 @@ router.patch('/:id/estado', auth, async (req, res, next) => {
   }
 });
 
+router.delete('/:id', auth, async (req, res, next) => {
+  try {
+    await prisma.entrevista.delete({ where: { id: req.params.id } });
+    res.status(204).end();
+  } catch (err) {
+    if (err.code === 'P2025') {
+      return res.status(404).json({ error: true, message: 'Entrevista no encontrada', code: 'NOT_FOUND' });
+    }
+    next(err);
+  }
+});
+
 module.exports = router;
