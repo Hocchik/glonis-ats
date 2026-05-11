@@ -16,6 +16,8 @@ function cleanupFile(req) {
 
 router.get('/vacantes/:slug', async (req, res, next) => {
   try {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+
     const vacante = await prisma.vacante.findUnique({
       where: { slug: req.params.slug },
       select: {

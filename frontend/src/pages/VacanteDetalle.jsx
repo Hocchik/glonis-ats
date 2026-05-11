@@ -32,6 +32,22 @@ async function descargarCV(candidatoId, nombre) {
   }
 }
 
+const TURNOS_OPCIONES = ['Mañana', 'Tarde', 'Noche'];
+const CONTRATOS_OPCIONES = ['Tiempo completo', 'Medio tiempo', 'Part-time', 'Por horas', 'Temporal', 'Practicante'];
+const AREAS = ['VENTAS', 'CAJA', 'ALMACEN', 'VISUAL', 'OTRO'];
+const AREA_LABEL = { VENTAS: 'Ventas en tienda', CAJA: 'Caja', ALMACEN: 'Almacén', VISUAL: 'Visual', OTRO: 'Operaciones' };
+
+const ESTADO_BADGE = {
+  ACTIVA:  'bg-emerald-50 text-emerald-700 border-emerald-200',
+  PAUSADA: 'bg-amber-50 text-amber-700 border-amber-200',
+  CERRADA: 'bg-gray-100 text-gray-600 border-gray-200',
+};
+
+function parseLista(str) {
+  if (!str) return [];
+  return str.split(/\s*[,/]\s*/).filter(Boolean);
+}
+
 const ETAPAS = ['POSTULADO', 'EN_REVISION', 'ENTREVISTA', 'OFERTA', 'DESCARTADO'];
 const ETAPA_STYLE = {
   POSTULADO:   'bg-gray-100 text-gray-600',
@@ -67,11 +83,70 @@ function ScoreBadge({ value }) {
 export default function VacanteDetalle() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { data: vacante, loading: loadingV } = useApi(`/api/vacantes/${id}`);
+  const { data: vacante, loading: loadingV, refetch: refetchVacante } = useApi(`/api/vacantes/${id}`);
   const { data: postulaciones, loading: loadingP, refetch } = useApi(`/api/postulaciones?vacanteId=${id}`);
   const [selected, setSelected] = useState(null);
   const [coherencia, setCoherencia] = useState('');
   const [savingCoh, setSavingCoh] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+  const [editForm, setEditForm] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  function abrirEditar() {
+    setEditForm({
+      titulo: vacante.titulo,
+      area: vacante.area,
+      descripcion: vacante.descripcion,
+      requisitos: vacante.requisitos,
+      tiposContrato: parseLista(vacante.tipoContrato),
+      turnos: parseLista(vacante.turno),
+      fechaCierre: vacante.fechaCierre ? vacante.fechaCierre.slice(0, 10) : '',
+      estado: vacante.estado,
+    });
+    setEditError('');
+    setEditModal(true);
+  }
+
+  function toggleItem(arr, item) {
+    return arr.includes(item) ? arr.filter(x => x !== item) : [...arr, item];
+  }
+
+  async function guardarEdicion(e) {
+    e.preventDefault();
+    setEditError('');
+    if (editForm.tiposContrato.length === 0) { setEditError('Selecciona al menos un tipo de contrato.'); return; }
+    if (editForm.turnos.length === 0) { setEditError('Selecciona al menos un turno.'); return; }
+    setSavingEdit(true);
+    try {
+      await api.put(`/api/vacantes/${id}`, {
+        titulo: editForm.titulo,
+        area: editForm.area,
+        descripcion: editForm.descripcion,
+        requisitos: editForm.requisitos,
+        tipoContrato: editForm.tiposContrato.join(', '),
+        turno: editForm.turnos.join(' / '),
+        fechaCierre: editForm.fechaCierre || null,
+      });
+      if (editForm.estado !== vacante.estado) {
+        await api.patch(`/api/vacantes/${id}/estado`, { estado: editForm.estado });
+      }
+      await refetchVacante();
+      setEditModal(false);
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  function copiarLink() {
+    if (!vacante?.slug) return;
+    navigator.clipboard.writeText(`${window.location.origin}/postular/${vacante.slug}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   async function handleCoherencia(postId) {
     if (!coherencia) return;
@@ -108,13 +183,37 @@ export default function VacanteDetalle() {
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
             Vacantes
           </button>
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-gray-900">{vacante.titulo}</h2>
-            <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-              {vacante.estado}
-            </span>
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold text-gray-900 truncate">{vacante.titulo}</h2>
+                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold border ${ESTADO_BADGE[vacante.estado] || ESTADO_BADGE.CERRADA}`}>
+                  {vacante.estado}
+                </span>
+              </div>
+              <p className="text-sm text-gray-400 mt-0.5">{AREA_LABEL[vacante.area] || vacante.area} · {vacante.tipoContrato} · {vacante.turno} · {lista.length} postulantes</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={copiarLink}
+                className="flex items-center gap-1.5 px-3.5 py-2 border border-gray-200 hover:border-gray-300 bg-white hover:bg-gray-50 rounded-xl text-sm font-medium text-gray-700 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                </svg>
+                {copied ? '¡Copiado!' : 'Copiar link'}
+              </button>
+              <button
+                onClick={abrirEditar}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Editar vacante
+              </button>
+            </div>
           </div>
-          <p className="text-sm text-gray-400 mt-0.5">{vacante.area} · {vacante.tipoContrato} · {vacante.turno} · {lista.length} postulantes</p>
         </div>
 
         {/* Tabla */}
@@ -306,6 +405,100 @@ export default function VacanteDetalle() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {editModal && editForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="font-semibold text-gray-900">Editar vacante</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Ajusta los datos y el estado de la vacante.</p>
+              </div>
+              <button onClick={() => setEditModal(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors text-lg">&times;</button>
+            </div>
+            <form onSubmit={guardarEdicion} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Título *</label>
+                <input value={editForm.titulo} onChange={e => setEditForm({...editForm, titulo: e.target.value})}
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400" required />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Área *</label>
+                  <select value={editForm.area} onChange={e => setEditForm({...editForm, area: e.target.value})}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                    {AREAS.map(a => <option key={a} value={a}>{AREA_LABEL[a]}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Fecha cierre</label>
+                  <input type="date" value={editForm.fechaCierre} onChange={e => setEditForm({...editForm, fechaCierre: e.target.value})}
+                    className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo de contrato *</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CONTRATOS_OPCIONES.map(c => (
+                    <button key={c} type="button"
+                      onClick={() => setEditForm({...editForm, tiposContrato: toggleItem(editForm.tiposContrato, c)})}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${editForm.tiposContrato.includes(c) ? 'bg-indigo-50 text-indigo-700 border-indigo-300' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Turno *</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {TURNOS_OPCIONES.map(t => (
+                    <button key={t} type="button"
+                      onClick={() => setEditForm({...editForm, turnos: toggleItem(editForm.turnos, t)})}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${editForm.turnos.includes(t) ? 'bg-indigo-50 text-indigo-700 border-indigo-300' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Estado</label>
+                <div className="flex gap-1.5">
+                  {['ACTIVA', 'PAUSADA', 'CERRADA'].map(es => (
+                    <button key={es} type="button"
+                      onClick={() => setEditForm({...editForm, estado: es})}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${editForm.estado === es ? 'bg-indigo-50 text-indigo-700 border-indigo-300' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
+                      {es}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  {editForm.estado === 'PAUSADA' && 'No recibirá nuevas postulaciones. El link público estará deshabilitado.'}
+                  {editForm.estado === 'CERRADA' && 'La vacante quedará archivada. El link público estará deshabilitado.'}
+                  {editForm.estado === 'ACTIVA' && 'Aceptando postulaciones desde el link público.'}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Descripción *</label>
+                <textarea value={editForm.descripcion} onChange={e => setEditForm({...editForm, descripcion: e.target.value})} rows={3} required
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 resize-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Requisitos *</label>
+                <textarea value={editForm.requisitos} onChange={e => setEditForm({...editForm, requisitos: e.target.value})} rows={2} required
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 resize-none" />
+              </div>
+              {editError && <p className="text-sm text-red-600 bg-red-50 px-3.5 py-2.5 rounded-xl border border-red-100">{editError}</p>}
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setEditModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">Cancelar</button>
+                <button type="submit" disabled={savingEdit}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-sm font-medium rounded-xl transition-colors">
+                  {savingEdit ? 'Guardando...' : 'Guardar cambios'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -11,11 +11,20 @@ const ESTADO_COLOR = { PROGRAMADA: '#6366f1', REALIZADA: '#22c55e', CANCELADA: '
 
 const EMPTY_FORM = { vacanteId: '', postulacionId: '', fechaHora: '', modalidad: 'PRESENCIAL', notas: '' };
 
-function toDatetimeLocal(iso) {
+// Perú es UTC-5 (sin horario de verano). Tratamos los inputs como hora Perú.
+const PERU_OFFSET_MS = 5 * 60 * 60 * 1000;
+
+// Toma un ISO UTC y devuelve "YYYY-MM-DDTHH:mm" en hora Perú (para datetime-local input)
+function utcToPeruLocal(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const ms = new Date(iso).getTime() - PERU_OFFSET_MS;
+  return new Date(ms).toISOString().slice(0, 16);
+}
+
+// Toma "YYYY-MM-DDTHH:mm" (interpretado como hora Perú) y devuelve ISO UTC
+function peruLocalToUTC(localStr) {
+  if (!localStr) return '';
+  return new Date(localStr + ':00-05:00').toISOString();
 }
 
 export default function Calendario() {
@@ -44,14 +53,19 @@ export default function Calendario() {
     return postulacionesEntrevista.filter(p => p.vacanteId === form.vacanteId);
   }, [postulacionesEntrevista, form.vacanteId]);
 
-  const events = (entrevistas || []).map((e) => ({
-    id: e.id,
-    title: `${e.postulacion.candidato.nombre} — ${e.postulacion.vacante.titulo}`,
-    start: e.fechaHora,
-    backgroundColor: ESTADO_COLOR[e.estado] || ESTADO_COLOR.PROGRAMADA,
-    borderColor: 'transparent',
-    extendedProps: { entrevista: e },
-  }));
+  const events = (entrevistas || []).map((e) => {
+    const color = ESTADO_COLOR[e.estado] || ESTADO_COLOR.PROGRAMADA;
+    return {
+      id: e.id,
+      title: `${e.postulacion.candidato.nombre} — ${e.postulacion.vacante.titulo}`,
+      start: e.fechaHora,
+      backgroundColor: color,
+      borderColor: color,
+      textColor: '#ffffff',
+      display: 'block',
+      extendedProps: { entrevista: e },
+    };
+  });
 
   function abrirCrear() {
     setEditando(null);
@@ -65,7 +79,7 @@ export default function Calendario() {
     setForm({
       vacanteId: e.postulacion.vacante.id,
       postulacionId: e.postulacion.id,
-      fechaHora: toDatetimeLocal(e.fechaHora),
+      fechaHora: utcToPeruLocal(e.fechaHora),
       modalidad: e.modalidad,
       notas: e.notas || '',
       estado: e.estado,
@@ -83,9 +97,10 @@ export default function Calendario() {
     }
     setSaving(true);
     try {
+      const fechaUTC = peruLocalToUTC(form.fechaHora);
       if (editando) {
         await api.put(`/api/entrevistas/${editando.id}`, {
-          fechaHora: form.fechaHora,
+          fechaHora: fechaUTC,
           modalidad: form.modalidad,
           notas: form.notas,
           estado: form.estado,
@@ -93,7 +108,7 @@ export default function Calendario() {
       } else {
         await api.post('/api/entrevistas', {
           postulacionId: form.postulacionId,
-          fechaHora: form.fechaHora,
+          fechaHora: fechaUTC,
           modalidad: form.modalidad,
           notas: form.notas,
         });
