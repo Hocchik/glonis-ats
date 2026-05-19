@@ -31,12 +31,21 @@ export default function FormularioPublico() {
   const [captchaToken, setCaptchaToken] = useState('');
 
   const [personal, setPersonal] = useState({ nombre: '', email: '', telefono: '', dni: '', distrito: '', referido: '' });
-  const [disponibilidad, setDisponibilidad] = useState({ turnoManana: false, turnoTarde: false, turnoNoche: false, finesDeSemanaDispo: false, horasSemanales: '' });
+  const [disponibilidad, setDisponibilidad] = useState({ modalidad: '', turnoManana: false, turnoTarde: false });
   const [respuestas, setRespuestas] = useState({});
   const [cv, setCv] = useState(null);
   const [aceptaPrivacidad, setAceptaPrivacidad] = useState(false);
 
-  function next() { setStep(s => Math.min(4, s + 1)); }
+  function next() {
+    if (step === 2) {
+      if (!disponibilidad.modalidad) { setSubmitError('Selecciona tu modalidad de trabajo'); return; }
+      if (disponibilidad.modalidad === 'PARTTIME' && !disponibilidad.turnoManana && !disponibilidad.turnoTarde) {
+        setSubmitError('Para medio tiempo, selecciona al menos un turno'); return;
+      }
+    }
+    setSubmitError('');
+    setStep(s => Math.min(4, s + 1));
+  }
   function prev() { setStep(s => Math.max(1, s - 1)); }
 
   async function handleSubmit(e) {
@@ -44,6 +53,10 @@ export default function FormularioPublico() {
     if (!captchaToken) { setSubmitError('Completa el CAPTCHA'); return; }
     if (Object.keys(respuestas).length < 18) { setSubmitError('Responde todas las preguntas del cuestionario'); return; }
     if (!cv) { setSubmitError('Adjunta tu CV en PDF'); return; }
+    if (!disponibilidad.modalidad) { setSubmitError('Selecciona tu modalidad de trabajo'); return; }
+    if (disponibilidad.modalidad === 'PARTTIME' && !disponibilidad.turnoManana && !disponibilidad.turnoTarde) {
+      setSubmitError('Para medio tiempo, selecciona al menos un turno'); return;
+    }
 
     setSubmitting(true);
     setSubmitError('');
@@ -52,7 +65,10 @@ export default function FormularioPublico() {
     fd.append('nombre', nombreCompleto);
     const { nombre: _n, apellidos: _a, fechaNac: _fn, referido: _r, ...personalRest } = personal;
     Object.entries(personalRest).forEach(([k, v]) => fd.append(k, v));
-    Object.entries(disponibilidad).forEach(([k, v]) => fd.append(k, v));
+    const dispoFinal = disponibilidad.modalidad === 'FULLTIME'
+      ? { modalidad: 'FULLTIME', turnoManana: true, turnoTarde: true }
+      : disponibilidad;
+    Object.entries(dispoFinal).forEach(([k, v]) => fd.append(k, v));
     fd.append('captchaToken', captchaToken);
     fd.append('respuestas', JSON.stringify(
       Object.entries(respuestas).map(([preguntaId, valorLikert]) => ({ preguntaId: Number(preguntaId), valorLikert: Number(valorLikert) }))
@@ -256,33 +272,55 @@ export default function FormularioPublico() {
               <div className="p-6 space-y-5">
                 <div>
                   <h2 className="text-lg font-bold text-gray-900">Disponibilidad horaria</h2>
-                  <p className="text-sm text-gray-400 mt-0.5">Cuéntanos cuándo puedes trabajar.</p>
+                  <p className="text-sm text-gray-400 mt-0.5">Cuéntanos qué modalidad de trabajo buscas.</p>
                 </div>
+
                 <div className="space-y-3">
                   {[
-                    { key: 'turnoManana', label: 'Turno mañana', sub: '6:00 am – 2:00 pm' },
-                    { key: 'turnoTarde', label: 'Turno tarde', sub: '2:00 pm – 10:00 pm' },
-                    { key: 'turnoNoche', label: 'Turno noche', sub: '10:00 pm – 6:00 am' },
-                    { key: 'finesDeSemanaDispo', label: 'Fines de semana', sub: 'Sábados y domingos' },
-                  ].map(({ key, label, sub }) => (
-                    <label key={key} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl cursor-pointer hover:border-indigo-300 transition-colors">
+                    { value: 'FULLTIME', label: 'Tiempo completo', sub: '8 horas — disponible mañana y tarde' },
+                    { value: 'PARTTIME', label: 'Medio tiempo', sub: '~4 horas — elige el/los turnos que cubres' },
+                  ].map(({ value, label, sub }) => (
+                    <label key={value}
+                      className={`flex items-start gap-3 p-4 border rounded-xl cursor-pointer transition-colors ${
+                        disponibilidad.modalidad === value ? 'border-indigo-400 bg-indigo-50/50' : 'border-gray-200 hover:border-indigo-300'
+                      }`}>
+                      <input type="radio" name="modalidad" value={value}
+                        checked={disponibilidad.modalidad === value}
+                        onChange={() => setDisponibilidad({ modalidad: value, turnoManana: value === 'FULLTIME', turnoTarde: value === 'FULLTIME' })}
+                        className="mt-0.5 w-4 h-4 accent-indigo-600" />
                       <div>
-                        <p className="text-sm font-medium text-gray-700">{label}</p>
-                        <p className="text-xs text-gray-400">{sub}</p>
+                        <p className="text-sm font-medium text-gray-800">{label}</p>
+                        <p className="text-xs text-gray-500">{sub}</p>
                       </div>
-                      <input type="checkbox" checked={disponibilidad[key]}
-                        onChange={e => setDisponibilidad({...disponibilidad, [key]: e.target.checked})}
-                        className="w-4 h-4 accent-indigo-600" />
                     </label>
                   ))}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Horas disponibles por semana</label>
-                  <input type="number" min="1" max="48" value={disponibilidad.horasSemanales}
-                    onChange={e => setDisponibilidad({...disponibilidad, horasSemanales: e.target.value})}
-                    className="w-32 px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
-                    placeholder="40" />
-                </div>
+
+                {disponibilidad.modalidad === 'PARTTIME' && (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-gray-700">¿Qué turno(s) puedes cubrir?</p>
+                    {[
+                      { key: 'turnoManana', label: 'Turno mañana', sub: '6:00 am – 2:00 pm' },
+                      { key: 'turnoTarde', label: 'Turno tarde', sub: '2:00 pm – 10:00 pm' },
+                    ].map(({ key, label, sub }) => (
+                      <label key={key} className="flex items-center justify-between p-4 border border-gray-200 rounded-xl cursor-pointer hover:border-indigo-300 transition-colors">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">{label}</p>
+                          <p className="text-xs text-gray-400">{sub}</p>
+                        </div>
+                        <input type="checkbox" checked={disponibilidad[key]}
+                          onChange={e => setDisponibilidad({ ...disponibilidad, [key]: e.target.checked })}
+                          className="w-4 h-4 accent-indigo-600" />
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                {disponibilidad.modalidad === 'FULLTIME' && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm text-emerald-800">
+                    Como tiempo completo, ya quedas disponible para ambos turnos automáticamente.
+                  </div>
+                )}
               </div>
             )}
 

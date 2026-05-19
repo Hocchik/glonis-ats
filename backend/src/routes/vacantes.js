@@ -6,7 +6,13 @@ const auth = require('../middleware/auth');
 const router = express.Router();
 
 const ESTADOS_VALIDOS = ['ACTIVA', 'PAUSADA', 'CERRADA'];
-const AREAS_VALIDAS = ['VENTAS', 'CAJA', 'ALMACEN', 'VISUAL', 'OTRO'];
+const PUESTOS_VALIDOS = [
+  'GERENTE_TIENDA', 'ASESOR_VENTAS', 'COORDINADOR_COMPRAS', 'JEFE_ALMACEN',
+  'COMMUNITY_MANAGER', 'PRACTICANTE_MARKETING', 'ANALISTA_RRHH', 'CONTADOR',
+  'PRACTICANTE_CONTABILIDAD', 'OPERADOR_SERVICIO_CLIENTE', 'AUXILIAR_TIENDA',
+  'AGENTE_SEGURIDAD_TIENDA', 'SUPERVISOR_SEGURIDAD', 'AGENTE_SEGURIDAD_ALMACEN',
+];
+const TURNOS_PREFERIDOS = ['MANANA', 'TARDE', 'AMBOS'];
 
 function generarSlug(titulo) {
   const base = titulo
@@ -29,11 +35,11 @@ router.get('/', auth, async (req, res, next) => {
       }
       where.estado = req.query.estado;
     }
-    if (req.query.area) {
-      if (!AREAS_VALIDAS.includes(req.query.area)) {
-        return res.status(400).json({ error: true, message: 'Área inválida', code: 'INVALID_AREA' });
+    if (req.query.puesto) {
+      if (!PUESTOS_VALIDOS.includes(req.query.puesto)) {
+        return res.status(400).json({ error: true, message: 'Puesto inválido', code: 'INVALID_PUESTO' });
       }
-      where.area = req.query.area;
+      where.puesto = req.query.puesto;
     }
 
     const vacantes = await prisma.vacante.findMany({
@@ -50,20 +56,28 @@ router.get('/', auth, async (req, res, next) => {
 
 router.post('/', auth, async (req, res, next) => {
   try {
-    const { titulo, area, descripcion, requisitos, tipoContrato, turno, fechaCierre } = req.body;
+    const { titulo, puesto, descripcion, requisitos, tipoContrato, turnoPreferido, fechaCierre } = req.body;
 
-    if (!titulo || !area || !descripcion || !requisitos || !tipoContrato || !turno) {
+    if (!titulo || !puesto || !descripcion || !requisitos || !tipoContrato || !turnoPreferido) {
       return res.status(400).json({ error: true, message: 'Campos requeridos incompletos', code: 'MISSING_FIELDS' });
+    }
+
+    if (!PUESTOS_VALIDOS.includes(puesto)) {
+      return res.status(400).json({ error: true, message: 'Puesto inválido', code: 'INVALID_PUESTO' });
+    }
+
+    if (!TURNOS_PREFERIDOS.includes(turnoPreferido)) {
+      return res.status(400).json({ error: true, message: 'Turno preferido inválido', code: 'INVALID_TURNO' });
     }
 
     const vacante = await prisma.vacante.create({
       data: {
         titulo,
-        area,
+        puesto,
         descripcion,
         requisitos,
         tipoContrato,
-        turno,
+        turnoPreferido,
         slug: generarSlug(titulo),
         fechaCierre: fechaCierre ? new Date(fechaCierre) : null,
         usuarioId: req.usuario.id,
@@ -95,17 +109,24 @@ router.get('/:id', auth, async (req, res, next) => {
 
 router.put('/:id', auth, async (req, res, next) => {
   try {
-    const { titulo, area, descripcion, requisitos, tipoContrato, turno, fechaCierre } = req.body;
+    const { titulo, puesto, descripcion, requisitos, tipoContrato, turnoPreferido, fechaCierre } = req.body;
+
+    if (puesto && !PUESTOS_VALIDOS.includes(puesto)) {
+      return res.status(400).json({ error: true, message: 'Puesto inválido', code: 'INVALID_PUESTO' });
+    }
+    if (turnoPreferido && !TURNOS_PREFERIDOS.includes(turnoPreferido)) {
+      return res.status(400).json({ error: true, message: 'Turno preferido inválido', code: 'INVALID_TURNO' });
+    }
 
     const vacante = await prisma.vacante.update({
       where: { id: req.params.id },
       data: {
         ...(titulo && { titulo }),
-        ...(area && { area }),
+        ...(puesto && { puesto }),
         ...(descripcion && { descripcion }),
         ...(requisitos && { requisitos }),
         ...(tipoContrato && { tipoContrato }),
-        ...(turno && { turno }),
+        ...(turnoPreferido && { turnoPreferido }),
         ...(fechaCierre && !isNaN(new Date(fechaCierre)) && { fechaCierre: new Date(fechaCierre) }),
       },
     });

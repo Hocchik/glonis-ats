@@ -4,6 +4,7 @@ import { useApi } from '../hooks/useApi';
 import { api } from '../lib/api';
 import Avatar from '../components/ui/Avatar';
 import { PREGUNTAS } from '../lib/preguntas';
+import { PUESTO_LABEL, PUESTOS_AGRUPADOS, TURNO_PREFERIDO_LABEL } from '../lib/puestos';
 
 async function descargarCV(candidatoId, nombre) {
   const base = import.meta.env.VITE_API_URL || '';
@@ -32,10 +33,8 @@ async function descargarCV(candidatoId, nombre) {
   }
 }
 
-const TURNOS_OPCIONES = ['Mañana', 'Tarde', 'Noche'];
 const CONTRATOS_OPCIONES = ['Tiempo completo', 'Medio tiempo', 'Part-time', 'Por horas', 'Temporal', 'Practicante'];
-const AREAS = ['VENTAS', 'CAJA', 'ALMACEN', 'VISUAL', 'OTRO'];
-const AREA_LABEL = { VENTAS: 'Ventas en tienda', CAJA: 'Caja', ALMACEN: 'Almacén', VISUAL: 'Visual', OTRO: 'Operaciones' };
+const TURNOS_PREFERIDOS = ['MANANA', 'TARDE', 'AMBOS'];
 
 const ESTADO_BADGE = {
   ACTIVA:  'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -97,11 +96,11 @@ export default function VacanteDetalle() {
   function abrirEditar() {
     setEditForm({
       titulo: vacante.titulo,
-      area: vacante.area,
+      puesto: vacante.puesto,
       descripcion: vacante.descripcion,
       requisitos: vacante.requisitos,
       tiposContrato: parseLista(vacante.tipoContrato),
-      turnos: parseLista(vacante.turno),
+      turnoPreferido: vacante.turnoPreferido || 'AMBOS',
       fechaCierre: vacante.fechaCierre ? vacante.fechaCierre.slice(0, 10) : '',
       estado: vacante.estado,
     });
@@ -117,16 +116,15 @@ export default function VacanteDetalle() {
     e.preventDefault();
     setEditError('');
     if (editForm.tiposContrato.length === 0) { setEditError('Selecciona al menos un tipo de contrato.'); return; }
-    if (editForm.turnos.length === 0) { setEditError('Selecciona al menos un turno.'); return; }
     setSavingEdit(true);
     try {
       await api.put(`/api/vacantes/${id}`, {
         titulo: editForm.titulo,
-        area: editForm.area,
+        puesto: editForm.puesto,
         descripcion: editForm.descripcion,
         requisitos: editForm.requisitos,
         tipoContrato: editForm.tiposContrato.join(', '),
-        turno: editForm.turnos.join(' / '),
+        turnoPreferido: editForm.turnoPreferido,
         fechaCierre: editForm.fechaCierre || null,
       });
       if (editForm.estado !== vacante.estado) {
@@ -191,7 +189,7 @@ export default function VacanteDetalle() {
                   {vacante.estado}
                 </span>
               </div>
-              <p className="text-sm text-gray-400 mt-0.5">{AREA_LABEL[vacante.area] || vacante.area} · {vacante.tipoContrato} · {vacante.turno} · {lista.length} postulantes</p>
+              <p className="text-sm text-gray-400 mt-0.5">{PUESTO_LABEL[vacante.puesto] || vacante.puesto} · {vacante.tipoContrato} · Turno {TURNO_PREFERIDO_LABEL[vacante.turnoPreferido] || vacante.turnoPreferido} · {lista.length} postulantes</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
@@ -364,9 +362,11 @@ export default function VacanteDetalle() {
               <div className="p-4 border-b border-gray-100">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Disponibilidad</p>
                 <div className="flex flex-wrap gap-1.5 text-xs">
+                  <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-semibold">
+                    {selected.disponibilidad.modalidad === 'FULLTIME' ? 'Tiempo completo' : 'Medio tiempo'}
+                  </span>
                   {selected.disponibilidad.turnoManana && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Mañana</span>}
                   {selected.disponibilidad.turnoTarde && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Tarde</span>}
-                  {selected.disponibilidad.turnoNoche && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Noche</span>}
                   {selected.disponibilidad.finesDeSemanaDispo && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Fines de semana</span>}
                   <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{selected.disponibilidad.horasSemanales}h/sem</span>
                 </div>
@@ -427,10 +427,14 @@ export default function VacanteDetalle() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Área *</label>
-                  <select value={editForm.area} onChange={e => setEditForm({...editForm, area: e.target.value})}
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Puesto *</label>
+                  <select value={editForm.puesto} onChange={e => setEditForm({...editForm, puesto: e.target.value})}
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
-                    {AREAS.map(a => <option key={a} value={a}>{AREA_LABEL[a]}</option>)}
+                    {PUESTOS_AGRUPADOS.map(({ grupo, puestos }) => (
+                      <optgroup key={grupo} label={grupo}>
+                        {puestos.map(p => <option key={p} value={p}>{PUESTO_LABEL[p]}</option>)}
+                      </optgroup>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -452,16 +456,11 @@ export default function VacanteDetalle() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Turno *</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {TURNOS_OPCIONES.map(t => (
-                    <button key={t} type="button"
-                      onClick={() => setEditForm({...editForm, turnos: toggleItem(editForm.turnos, t)})}
-                      className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${editForm.turnos.includes(t) ? 'bg-indigo-50 text-indigo-700 border-indigo-300' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
-                      {t}
-                    </button>
-                  ))}
-                </div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Turno preferido *</label>
+                <select value={editForm.turnoPreferido} onChange={e => setEditForm({...editForm, turnoPreferido: e.target.value})}
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                  {TURNOS_PREFERIDOS.map(t => <option key={t} value={t}>{TURNO_PREFERIDO_LABEL[t]}</option>)}
+                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Estado</label>

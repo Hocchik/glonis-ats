@@ -13,25 +13,20 @@ function calcularScoreCuestionario(respuestas) {
   return (suma / (18 * 5)) * 100;
 }
 
-function calcularScoreDisponibilidad(disponibilidad) {
+function calcularScoreDisponibilidad(disponibilidad, turnoPreferido) {
   if (!disponibilidad) return 0;
 
-  let score = 0;
+  // FULLTIME cubre cualquier turno
+  if (disponibilidad.modalidad === 'FULLTIME') return 100;
 
-  // Turnos: hasta 75 puntos (25 por turno)
-  if (disponibilidad.turnoManana) score += 25;
-  if (disponibilidad.turnoTarde) score += 25;
-  if (disponibilidad.turnoNoche) score += 25;
+  // PARTTIME — depende de si el candidato cubre el turno preferido de la vacante
+  const ambosCandidato = disponibilidad.turnoManana && disponibilidad.turnoTarde;
 
-  // Fines de semana: 15 puntos
-  if (disponibilidad.finesDeSemanaDispo) score += 15;
+  if (turnoPreferido === 'AMBOS' || ambosCandidato) return 75;
+  if (turnoPreferido === 'MANANA' && disponibilidad.turnoManana) return 75;
+  if (turnoPreferido === 'TARDE' && disponibilidad.turnoTarde) return 75;
 
-  // Horas semanales: proporcional a 10 puntos (asumiendo 48h como máximo)
-  const horasMax = 48;
-  const horas = Math.min(disponibilidad.horasSemanales || 0, horasMax);
-  score += (horas / horasMax) * 10;
-
-  return Math.min(100, score);
+  return 25;
 }
 
 function calcularScoreTotal(scoreCV, scoreDisponibilidad, scoreCuestionario, scoreCoherencia = 0) {

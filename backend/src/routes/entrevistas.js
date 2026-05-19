@@ -32,7 +32,7 @@ router.get('/', auth, async (req, res, next) => {
         postulacion: {
           include: {
             candidato: { select: { id: true, nombre: true, email: true } },
-            vacante: { select: { id: true, titulo: true, area: true } },
+            vacante: { select: { id: true, titulo: true, puesto: true } },
           },
         },
       },

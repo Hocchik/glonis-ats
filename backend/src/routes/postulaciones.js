@@ -26,7 +26,7 @@ router.get('/', auth, async (req, res, next) => {
           select: { id: true, nombre: true, email: true, telefono: true, distrito: true, cvUrl: true },
         },
         vacante: {
-          select: { id: true, titulo: true, area: true, slug: true },
+          select: { id: true, titulo: true, puesto: true, slug: true },
         },
         score: {
           select: {
@@ -52,7 +52,7 @@ router.get('/:id', auth, async (req, res, next) => {
       include: {
         candidato: true,
         vacante: {
-          select: { id: true, titulo: true, area: true, slug: true, estado: true },
+          select: { id: true, titulo: true, puesto: true, slug: true, estado: true },
         },
         score: true,
         respuestas: { orderBy: { preguntaId: 'asc' } },

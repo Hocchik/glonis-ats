@@ -23,28 +23,48 @@ enum Rol {
 }
 
 model Vacante {
-  id            String        @id @default(uuid())
-  titulo        String
-  area          AreaVacante
-  descripcion   String
-  requisitos    String
-  tipoContrato  String
-  turno         String
-  estado        EstadoVacante @default(ACTIVA)
-  slug          String        @unique
-  fechaCierre   DateTime?
-  creadoEn      DateTime      @default(now())
-  creadoPor     Usuario       @relation(fields: [usuarioId], references: [id])
-  usuarioId     String
-  postulaciones Postulacion[]
+  id             String         @id @default(uuid())
+  titulo         String
+  puesto         PuestoTipo
+  descripcion    String
+  requisitos     String
+  tipoContrato   String
+  turnoPreferido TurnoPreferido @default(AMBOS)
+  estado         EstadoVacante  @default(ACTIVA)
+  slug           String         @unique
+  fechaCierre    DateTime?
+  creadoEn       DateTime       @default(now())
+  creadoPor      Usuario        @relation(fields: [usuarioId], references: [id])
+  usuarioId      String
+  postulaciones  Postulacion[]
 }
 
-enum AreaVacante {
-  VENTAS
-  CAJA
-  ALMACEN
-  VISUAL
-  OTRO
+enum PuestoTipo {
+  GERENTE_TIENDA
+  ASESOR_VENTAS
+  COORDINADOR_COMPRAS
+  JEFE_ALMACEN
+  COMMUNITY_MANAGER
+  PRACTICANTE_MARKETING
+  ANALISTA_RRHH
+  CONTADOR
+  PRACTICANTE_CONTABILIDAD
+  OPERADOR_SERVICIO_CLIENTE
+  AUXILIAR_TIENDA
+  AGENTE_SEGURIDAD_TIENDA
+  SUPERVISOR_SEGURIDAD
+  AGENTE_SEGURIDAD_ALMACEN
+}
+
+enum TurnoPreferido {
+  MANANA
+  TARDE
+  AMBOS
+}
+
+enum ModalidadTrabajo {
+  FULLTIME
+  PARTTIME
 }
 
 enum EstadoVacante {
@@ -102,14 +122,12 @@ model ScoreDetalle {
 }
 
 model Disponibilidad {
-  id                 String      @id @default(uuid())
-  turnoManana        Boolean
-  turnoTarde         Boolean
-  turnoNoche         Boolean
-  finesDeSemanaDispo Boolean
-  horasSemanales     Int
-  postulacion        Postulacion @relation(fields: [postulacionId], references: [id])
-  postulacionId      String      @unique
+  id            String           @id @default(uuid())
+  modalidad     ModalidadTrabajo
+  turnoManana   Boolean
+  turnoTarde    Boolean
+  postulacion   Postulacion      @relation(fields: [postulacionId], references: [id])
+  postulacionId String           @unique
 }
 
 model RespuestaFormulario {

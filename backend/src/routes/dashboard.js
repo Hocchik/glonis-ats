@@ -53,7 +53,7 @@ router.get('/top-candidatos', auth, async (req, res, next) => {
       take: 5,
       include: {
         candidato: { select: { id: true, nombre: true, email: true } },
-        vacante: { select: { id: true, titulo: true, area: true } },
+        vacante: { select: { id: true, titulo: true, puesto: true } },
         score: {
           select: { scoreCV: true, scoreDisponibilidad: true, scoreCuestionario: true, scoreCoherencia: true },
         },

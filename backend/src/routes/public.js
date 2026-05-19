@@ -23,11 +23,11 @@ router.get('/vacantes/:slug', async (req, res, next) => {
       select: {
         id: true,
         titulo: true,
-        area: true,
+        puesto: true,
         descripcion: true,
         requisitos: true,
         tipoContrato: true,
-        turno: true,
+        turnoPreferido: true,
         estado: true,
         fechaCierre: true,
       },
@@ -103,13 +103,24 @@ router.post('/postular/:slug', upload.single('cv'), async (req, res, next) => {
     }
 
     // Disponibilidad
-    const disponibilidad = {
-      turnoManana: rest.turnoManana === 'true' || rest.turnoManana === true,
-      turnoTarde: rest.turnoTarde === 'true' || rest.turnoTarde === true,
-      turnoNoche: rest.turnoNoche === 'true' || rest.turnoNoche === true,
-      finesDeSemanaDispo: rest.finesDeSemanaDispo === 'true' || rest.finesDeSemanaDispo === true,
-      horasSemanales: parseInt(rest.horasSemanales) || 0,
-    };
+    const modalidad = rest.modalidad;
+    if (modalidad !== 'FULLTIME' && modalidad !== 'PARTTIME') {
+      cleanupFile(req);
+      return res.status(400).json({ error: true, message: 'Modalidad inválida (FULLTIME o PARTTIME)', code: 'INVALID_MODALIDAD' });
+    }
+
+    let turnoManana = rest.turnoManana === 'true' || rest.turnoManana === true;
+    let turnoTarde = rest.turnoTarde === 'true' || rest.turnoTarde === true;
+
+    if (modalidad === 'FULLTIME') {
+      turnoManana = true;
+      turnoTarde = true;
+    } else if (!turnoManana && !turnoTarde) {
+      cleanupFile(req);
+      return res.status(400).json({ error: true, message: 'Para medio tiempo selecciona al menos un turno', code: 'MISSING_TURNO' });
+    }
+
+    const disponibilidad = { modalidad, turnoManana, turnoTarde };
 
     // Respuestas Likert — validar exactamente 18 respuestas con valores 1-5
     let respuestas = [];
@@ -136,8 +147,8 @@ router.post('/postular/:slug', upload.single('cv'), async (req, res, next) => {
     const cvUrl = `/uploads/${req.file.filename}`;
 
     // Extraer CV y calcular scores
-    const { scoreCV, keywordsEncontradas } = await extractCV(req.file.path);
-    const scoreDisponibilidad = calcularScoreDisponibilidad(disponibilidad);
+    const { scoreCV, keywordsEncontradas } = await extractCV(req.file.path, vacante.puesto);
+    const scoreDisponibilidad = calcularScoreDisponibilidad(disponibilidad, vacante.turnoPreferido);
     const scoreCuestionario = calcularScoreCuestionario(respuestas);
     const scoreTotal = calcularScoreTotal(scoreCV, scoreDisponibilidad, scoreCuestionario, 0);
 

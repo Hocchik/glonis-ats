@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { api } from '../lib/api';
-
-const AREAS = ['VENTAS', 'CAJA', 'ALMACEN', 'VISUAL', 'OTRO'];
+import { PUESTO_LABEL, PUESTOS_AGRUPADOS, TURNO_PREFERIDO_LABEL } from '../lib/puestos';
 
 const ESTADO_STYLE = {
   ACTIVA:  { dot: 'bg-emerald-400', badge: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
@@ -11,14 +10,12 @@ const ESTADO_STYLE = {
   CERRADA: { dot: 'bg-gray-400',    badge: 'text-gray-600 bg-gray-100 border-gray-200'        },
 };
 
-const AREA_LABEL = { VENTAS: 'Ventas en tienda', CAJA: 'Caja', ALMACEN: 'Almacén', VISUAL: 'Visual', OTRO: 'Operaciones' };
-
-const TURNOS_OPCIONES = ['Mañana', 'Tarde', 'Noche'];
 const CONTRATOS_OPCIONES = ['Tiempo completo', 'Medio tiempo', 'Part-time', 'Por horas', 'Temporal', 'Practicante'];
+const TURNOS_PREFERIDOS = ['MANANA', 'TARDE', 'AMBOS'];
 
 const EMPTY_FORM = {
-  titulo: '', area: 'VENTAS', descripcion: '', requisitos: '',
-  tiposContrato: [], turnos: [], fechaCierre: '', estado: 'ACTIVA',
+  titulo: '', puesto: 'ASESOR_VENTAS', descripcion: '', requisitos: '',
+  tiposContrato: [], turnoPreferido: 'AMBOS', fechaCierre: '', estado: 'ACTIVA',
 };
 
 function parseLista(str) {
@@ -87,11 +84,11 @@ export default function Vacantes() {
     setModoEdicion(v);
     setForm({
       titulo: v.titulo,
-      area: v.area,
+      puesto: v.puesto,
       descripcion: v.descripcion,
       requisitos: v.requisitos,
       tiposContrato: parseLista(v.tipoContrato),
-      turnos: parseLista(v.turno),
+      turnoPreferido: v.turnoPreferido || 'AMBOS',
       fechaCierre: v.fechaCierre ? v.fechaCierre.slice(0, 10) : '',
       estado: v.estado,
     });
@@ -110,19 +107,15 @@ export default function Vacantes() {
       setFormError('Selecciona al menos un tipo de contrato.');
       return;
     }
-    if (form.turnos.length === 0) {
-      setFormError('Selecciona al menos un turno.');
-      return;
-    }
     setSaving(true);
     try {
       const body = {
         titulo: form.titulo,
-        area: form.area,
+        puesto: form.puesto,
         descripcion: form.descripcion,
         requisitos: form.requisitos,
         tipoContrato: form.tiposContrato.join(', '),
-        turno: form.turnos.join(' / '),
+        turnoPreferido: form.turnoPreferido,
         fechaCierre: form.fechaCierre || null,
       };
       if (modoEdicion) {
@@ -227,7 +220,7 @@ export default function Vacantes() {
                     </span>
                   </div>
                   <span className="text-xs text-gray-400">·</span>
-                  <span className="text-xs text-gray-400 font-medium">{AREA_LABEL[v.area] || v.area}</span>
+                  <span className="text-xs text-gray-400 font-medium">{PUESTO_LABEL[v.puesto] || v.puesto}</span>
                   <div className="ml-auto flex items-center gap-2">
                     <button
                       onClick={(e) => copyLink(e, v.slug)}
@@ -263,7 +256,7 @@ export default function Vacantes() {
                 <h3 className="font-semibold text-gray-900 mb-0.5 group-hover:text-indigo-700 transition-colors">
                   {v.titulo}
                 </h3>
-                <p className="text-xs text-gray-400 mb-3">{v.tipoContrato} · {v.turno}</p>
+                <p className="text-xs text-gray-400 mb-3">{v.tipoContrato} · Turno {TURNO_PREFERIDO_LABEL[v.turnoPreferido] || v.turnoPreferido}</p>
 
                 <div className="flex items-center gap-3 text-xs text-gray-400 mb-3">
                   <div className="flex items-center gap-1">
@@ -314,10 +307,14 @@ export default function Vacantes() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Área *</label>
-                  <select value={form.area} onChange={e => setForm({...form, area: e.target.value})}
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Puesto *</label>
+                  <select value={form.puesto} onChange={e => setForm({...form, puesto: e.target.value})}
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400">
-                    {AREAS.map(a => <option key={a} value={a}>{AREA_LABEL[a]}</option>)}
+                    {PUESTOS_AGRUPADOS.map(({ grupo, puestos }) => (
+                      <optgroup key={grupo} label={grupo}>
+                        {puestos.map(p => <option key={p} value={p}>{PUESTO_LABEL[p]}</option>)}
+                      </optgroup>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -338,13 +335,12 @@ export default function Vacantes() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Turno * <span className="text-gray-400 font-normal">(uno o varios)</span></label>
-                <div className="flex flex-wrap gap-1.5">
-                  {TURNOS_OPCIONES.map(t => (
-                    <ChipToggle key={t} label={t} active={form.turnos.includes(t)}
-                      onClick={() => setForm({ ...form, turnos: toggleItem(form.turnos, t) })} />
-                  ))}
-                </div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Turno preferido *</label>
+                <select value={form.turnoPreferido} onChange={e => setForm({...form, turnoPreferido: e.target.value})}
+                  className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400">
+                  {TURNOS_PREFERIDOS.map(t => <option key={t} value={t}>{TURNO_PREFERIDO_LABEL[t]}</option>)}
+                </select>
+                <p className="text-xs text-gray-400 mt-1.5">Informativo para el score — un candidato full-time siempre suma 100; uno part-time gana 75 si su turno coincide.</p>
               </div>
 
               {modoEdicion && (
