@@ -4,7 +4,7 @@ import { useApi } from '../hooks/useApi';
 import { api } from '../lib/api';
 import Avatar from '../components/ui/Avatar';
 import { PREGUNTAS } from '../lib/preguntas';
-import { PUESTO_LABEL, PUESTOS_AGRUPADOS, TURNO_PREFERIDO_LABEL } from '../lib/puestos';
+import { PUESTO_LABEL, PUESTOS_AGRUPADOS, TURNO_PREFERIDO_LABEL, CONTRATOS_OPCIONES, esPuestoPracticante, contratosPermitidos } from '../lib/puestos';
 
 async function descargarCV(candidatoId, nombre) {
   const base = import.meta.env.VITE_API_URL || '';
@@ -33,7 +33,6 @@ async function descargarCV(candidatoId, nombre) {
   }
 }
 
-const CONTRATOS_OPCIONES = ['Tiempo completo', 'Medio tiempo', 'Part-time', 'Por horas', 'Temporal', 'Practicante'];
 const TURNOS_PREFERIDOS = ['MANANA', 'TARDE', 'AMBOS'];
 
 const ESTADO_BADGE = {
@@ -110,6 +109,15 @@ export default function VacanteDetalle() {
 
   function toggleItem(arr, item) {
     return arr.includes(item) ? arr.filter(x => x !== item) : [...arr, item];
+  }
+
+  function handleEditPuestoChange(nuevoPuesto) {
+    const permitidos = contratosPermitidos(nuevoPuesto);
+    const filtrados = editForm.tiposContrato.filter(t => permitidos.includes(t));
+    const tipos = esPuestoPracticante(nuevoPuesto) && filtrados.length === 0
+      ? ['Prácticas']
+      : filtrados;
+    setEditForm({ ...editForm, puesto: nuevoPuesto, tiposContrato: tipos });
   }
 
   async function guardarEdicion(e) {
@@ -428,7 +436,7 @@ export default function VacanteDetalle() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Puesto *</label>
-                  <select value={editForm.puesto} onChange={e => setEditForm({...editForm, puesto: e.target.value})}
+                  <select value={editForm.puesto} onChange={e => handleEditPuestoChange(e.target.value)}
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
                     {PUESTOS_AGRUPADOS.map(({ grupo, puestos }) => (
                       <optgroup key={grupo} label={grupo}>
@@ -446,14 +454,28 @@ export default function VacanteDetalle() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo de contrato *</label>
                 <div className="flex flex-wrap gap-1.5">
-                  {CONTRATOS_OPCIONES.map(c => (
-                    <button key={c} type="button"
-                      onClick={() => setEditForm({...editForm, tiposContrato: toggleItem(editForm.tiposContrato, c)})}
-                      className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${editForm.tiposContrato.includes(c) ? 'bg-indigo-50 text-indigo-700 border-indigo-300' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}>
-                      {c}
-                    </button>
-                  ))}
+                  {CONTRATOS_OPCIONES.map(c => {
+                    const permitido = contratosPermitidos(editForm.puesto).includes(c);
+                    const activo = editForm.tiposContrato.includes(c);
+                    return (
+                      <button key={c} type="button"
+                        disabled={!permitido}
+                        onClick={() => setEditForm({...editForm, tiposContrato: toggleItem(editForm.tiposContrato, c)})}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                          !permitido ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' :
+                          activo ? 'bg-indigo-50 text-indigo-700 border-indigo-300' :
+                          'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                        }`}>
+                        {c}
+                      </button>
+                    );
+                  })}
                 </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  {esPuestoPracticante(editForm.puesto)
+                    ? 'Los puestos de practicante solo aceptan contrato de Prácticas.'
+                    : '"Prácticas" no aplica a este puesto.'}
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Turno preferido *</label>

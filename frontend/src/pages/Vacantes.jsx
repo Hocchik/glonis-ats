@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi';
 import { api } from '../lib/api';
-import { PUESTO_LABEL, PUESTOS_AGRUPADOS, TURNO_PREFERIDO_LABEL } from '../lib/puestos';
+import { PUESTO_LABEL, PUESTOS_AGRUPADOS, TURNO_PREFERIDO_LABEL, CONTRATOS_OPCIONES, esPuestoPracticante, contratosPermitidos } from '../lib/puestos';
 
 const ESTADO_STYLE = {
   ACTIVA:  { dot: 'bg-emerald-400', badge: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
@@ -10,7 +10,6 @@ const ESTADO_STYLE = {
   CERRADA: { dot: 'bg-gray-400',    badge: 'text-gray-600 bg-gray-100 border-gray-200'        },
 };
 
-const CONTRATOS_OPCIONES = ['Tiempo completo', 'Medio tiempo', 'Part-time', 'Por horas', 'Temporal', 'Practicante'];
 const TURNOS_PREFERIDOS = ['MANANA', 'TARDE', 'AMBOS'];
 
 const EMPTY_FORM = {
@@ -98,6 +97,17 @@ export default function Vacantes() {
 
   function toggleItem(arr, item) {
     return arr.includes(item) ? arr.filter(x => x !== item) : [...arr, item];
+  }
+
+  // Cuando cambia el puesto, ajusta los contratos seleccionados para que sean coherentes
+  function handlePuestoChange(nuevoPuesto) {
+    const permitidos = contratosPermitidos(nuevoPuesto);
+    const tiposFiltrados = form.tiposContrato.filter(t => permitidos.includes(t));
+    // Si es practicante y no tiene contrato, auto-selecciona "Prácticas"
+    const tipos = esPuestoPracticante(nuevoPuesto) && tiposFiltrados.length === 0
+      ? ['Prácticas']
+      : tiposFiltrados;
+    setForm({ ...form, puesto: nuevoPuesto, tiposContrato: tipos });
   }
 
   async function handleSubmit(e) {
@@ -313,7 +323,7 @@ export default function Vacantes() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Puesto *</label>
-                  <select value={form.puesto} onChange={e => setForm({...form, puesto: e.target.value})}
+                  <select value={form.puesto} onChange={e => handlePuestoChange(e.target.value)}
                     className="w-full px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400">
                     {PUESTOS_AGRUPADOS.map(({ grupo, puestos }) => (
                       <optgroup key={grupo} label={grupo}>
@@ -332,11 +342,28 @@ export default function Vacantes() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo de contrato * <span className="text-gray-400 font-normal">(uno o varios)</span></label>
                 <div className="flex flex-wrap gap-1.5">
-                  {CONTRATOS_OPCIONES.map(c => (
-                    <ChipToggle key={c} label={c} active={form.tiposContrato.includes(c)}
-                      onClick={() => setForm({ ...form, tiposContrato: toggleItem(form.tiposContrato, c) })} />
-                  ))}
+                  {CONTRATOS_OPCIONES.map(c => {
+                    const permitido = contratosPermitidos(form.puesto).includes(c);
+                    const activo = form.tiposContrato.includes(c);
+                    return (
+                      <button key={c} type="button"
+                        disabled={!permitido}
+                        onClick={() => setForm({ ...form, tiposContrato: toggleItem(form.tiposContrato, c) })}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                          !permitido ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed' :
+                          activo ? 'bg-indigo-50 text-indigo-700 border-indigo-300' :
+                          'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                        }`}>
+                        {c}
+                      </button>
+                    );
+                  })}
                 </div>
+                <p className="text-xs text-gray-400 mt-1.5">
+                  {esPuestoPracticante(form.puesto)
+                    ? 'Los puestos de practicante solo aceptan contrato de Prácticas.'
+                    : '"Prácticas" no aplica a este puesto.'}
+                </p>
               </div>
 
               <div>

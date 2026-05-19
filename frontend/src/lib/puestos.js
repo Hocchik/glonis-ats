@@ -50,3 +50,18 @@ export const TURNO_PREFERIDO_LABEL = {
   TARDE: 'Tarde',
   AMBOS: 'Ambos turnos',
 };
+
+export const PUESTOS_PRACTICANTE = ['PRACTICANTE_MARKETING', 'PRACTICANTE_CONTABILIDAD'];
+
+export const CONTRATOS_OPCIONES = ['Indefinido', 'Plazo fijo', 'Prácticas'];
+
+export function esPuestoPracticante(puesto) {
+  return PUESTOS_PRACTICANTE.includes(puesto);
+}
+
+// Calcula los contratos válidos para un puesto: practicante → solo "Prácticas"; resto → todos menos "Prácticas"
+export function contratosPermitidos(puesto) {
+  return esPuestoPracticante(puesto)
+    ? ['Prácticas']
+    : ['Indefinido', 'Plazo fijo'];
+}
