@@ -137,12 +137,17 @@ export default function Vacantes() {
     }
   }
 
-  async function handleDelete(id) {
+  async function handleDelete(id, force = false) {
     try {
-      await api.del(`/api/vacantes/${id}`);
+      await api.del(`/api/vacantes/${id}${force ? '?force=true' : ''}`);
       await refetch();
       setConfirmDelete(null);
     } catch (err) {
+      // Si hay postulaciones, mostramos confirmación con conteo en el mismo modal
+      if (err.code === 'HAS_POSTULACIONES' && confirmDelete) {
+        setConfirmDelete({ ...confirmDelete, conteo: err.data?.conteo ?? 0, requireForce: true });
+        return;
+      }
       alert(err.message);
       setConfirmDelete(null);
     }
@@ -393,15 +398,33 @@ export default function Vacantes() {
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-            <h3 className="font-semibold text-gray-900 mb-2">Eliminar vacante</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              ¿Seguro que deseas eliminar <span className="font-semibold">{confirmDelete.titulo}</span>?
-              Esta acción no se puede deshacer. Si la vacante tiene postulaciones, no podrá eliminarse — debes cerrarla.
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setConfirmDelete(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">Cancelar</button>
-              <button onClick={() => handleDelete(confirmDelete.id)} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-colors">Eliminar</button>
-            </div>
+            {confirmDelete.requireForce ? (
+              <>
+                <h3 className="font-semibold text-gray-900 mb-2">¿Seguro que deseas eliminarlo?</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  <span className="font-semibold">{confirmDelete.titulo}</span> tiene{' '}
+                  <span className="font-semibold text-red-600">{confirmDelete.conteo} postulación{confirmDelete.conteo !== 1 ? 'es' : ''}</span>.
+                  Si confirmas, se eliminarán también todas las postulaciones, scores y entrevistas asociadas.
+                  <br /><span className="text-xs text-gray-400">Esta acción no se puede deshacer.</span>
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setConfirmDelete(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">No</button>
+                  <button onClick={() => handleDelete(confirmDelete.id, true)} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-colors">Sí, eliminar todo</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="font-semibold text-gray-900 mb-2">Eliminar vacante</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  ¿Seguro que deseas eliminar <span className="font-semibold">{confirmDelete.titulo}</span>?
+                  Esta acción no se puede deshacer.
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setConfirmDelete(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors">Cancelar</button>
+                  <button onClick={() => handleDelete(confirmDelete.id)} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl transition-colors">Eliminar</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

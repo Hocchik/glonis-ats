@@ -19,6 +19,7 @@ async function request(path, options = {}) {
     const err = new Error(data.message || 'Error del servidor');
     err.code = data.code;
     err.status = res.status;
+    err.data = data;
     throw err;
   }
 
@@ -53,6 +54,7 @@ async function postForm(path, formData) {
     const err = new Error(data.message || 'Error del servidor');
     err.code = data.code;
     err.status = res.status;
+    err.data = data;
     throw err;
   }
 

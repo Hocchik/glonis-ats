@@ -142,16 +142,40 @@ router.put('/:id', auth, async (req, res, next) => {
 
 router.delete('/:id', auth, async (req, res, next) => {
   try {
-    const conteo = await prisma.postulacion.count({ where: { vacanteId: req.params.id } });
-    if (conteo > 0) {
+    const vacanteId = req.params.id;
+    const force = req.query.force === 'true' || req.query.force === '1';
+
+    const conteo = await prisma.postulacion.count({ where: { vacanteId } });
+
+    if (conteo > 0 && !force) {
       return res.status(409).json({
         error: true,
-        message: `No se puede eliminar: la vacante tiene ${conteo} postulación${conteo !== 1 ? 'es' : ''}. Ciérrala en su lugar.`,
+        message: `Esta vacante tiene ${conteo} postulación${conteo !== 1 ? 'es' : ''}. Confirma para eliminar todo.`,
         code: 'HAS_POSTULACIONES',
+        conteo,
       });
     }
 
-    await prisma.vacante.delete({ where: { id: req.params.id } });
+    if (conteo > 0) {
+      // Cascade manual dentro de transacción — los candidatos NO se eliminan (pueden tener otras postulaciones)
+      const postulaciones = await prisma.postulacion.findMany({
+        where: { vacanteId },
+        select: { id: true },
+      });
+      const ids = postulaciones.map((p) => p.id);
+
+      await prisma.$transaction([
+        prisma.entrevista.deleteMany({ where: { postulacionId: { in: ids } } }),
+        prisma.respuestaFormulario.deleteMany({ where: { postulacionId: { in: ids } } }),
+        prisma.scoreDetalle.deleteMany({ where: { postulacionId: { in: ids } } }),
+        prisma.disponibilidad.deleteMany({ where: { postulacionId: { in: ids } } }),
+        prisma.postulacion.deleteMany({ where: { vacanteId } }),
+        prisma.vacante.delete({ where: { id: vacanteId } }),
+      ]);
+    } else {
+      await prisma.vacante.delete({ where: { id: vacanteId } });
+    }
+
     res.status(204).end();
   } catch (err) {
     if (err.code === 'P2025') {
