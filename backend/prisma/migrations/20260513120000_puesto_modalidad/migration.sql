@@ -17,7 +17,9 @@ UPDATE "Vacante" SET "puesto" = CASE
   ELSE 'ASESOR_VENTAS' END;
 ALTER TABLE "Vacante" ALTER COLUMN "puesto" TYPE "PuestoTipo" USING "puesto"::"PuestoTipo";
 ALTER TABLE "Vacante" ALTER COLUMN "puesto" SET NOT NULL;
+ALTER TABLE "Vacante" ALTER COLUMN "turnoPreferido" DROP DEFAULT;
 ALTER TABLE "Vacante" ALTER COLUMN "turnoPreferido" TYPE "TurnoPreferido" USING "turnoPreferido"::"TurnoPreferido";
+ALTER TABLE "Vacante" ALTER COLUMN "turnoPreferido" SET DEFAULT 'AMBOS'::"TurnoPreferido";
 ALTER TABLE "Vacante" DROP COLUMN "area";
 ALTER TABLE "Vacante" DROP COLUMN "turno";
 DROP TYPE "AreaVacante";
