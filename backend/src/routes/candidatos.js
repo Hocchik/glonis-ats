@@ -44,7 +44,7 @@ router.get('/:id/cv', auth, async (req, res, next) => {
 
     // cvUrl es "/uploads/filename.pdf"
     const filename = path.basename(candidato.cvUrl);
-    const filePath = path.join(__dirname, '../../../../uploads', filename);
+    const filePath = path.join(__dirname, '../../../uploads', filename);
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: true, message: 'CV no encontrado', code: 'CV_NOT_FOUND' });
